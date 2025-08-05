@@ -1,65 +1,85 @@
-#include "scanner.hpp"
 #include <iostream>
-#include <iomanip>
-
-void printToken(const Token& token) {
-    std::cout << std::setw(15) << std::left << getTokenTypeName(token.type)
-              << " | " << std::setw(20) << std::left << token.value
-              << " | Line: " << std::setw(3) << token.line
-              << " | Col: " << std::setw(3) << token.column << std::endl;
-}
-
-void printHeader() {
-    std::cout << std::string(70, '=') << std::endl;
-    std::cout << "C++ LEXICAL SCANNER OUTPUT" << std::endl;
-    std::cout << std::string(70, '=') << std::endl;
-    std::cout << std::setw(15) << std::left << "TOKEN TYPE"
-              << " | " << std::setw(20) << std::left << "VALUE"
-              << " | " << "POSITION" << std::endl;
-    std::cout << std::string(70, '-') << std::endl;
-}
+#include <fstream>
+#include <memory>
+#include "tokens.hpp"
+#include "scanner.hpp"
+#include "parser.hpp"
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
-        std::cerr << "Example: " << argv[0] << " test.cpp" << std::endl;
-        return 1;
-    }
-
-    Scanner scanner;
-
-    if (!scanner.initialize(argv[1])) {
-        std::cerr << "Failed to initialize scanner with file: " << argv[1] << std::endl;
-        return 1;
-    }
-
-    std::cout << "Scanning file: " << argv[1] << std::endl;
-    printHeader();
-
-    Token token;
-    int tokenCount = 0;
-
-    do {
-        token = scanner.getNextToken();
-
-        // Skip whitespace and newline tokens for cleaner output
-        if (token.type != TokenType::T_WHITESPACE &&
-            token.type != TokenType::T_NEWLINE) {
-            printToken(token);
-            tokenCount++;
+    try {
+        if (argc != 2) {
+            std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
+            std::cerr << "Example: " << argv[0] << " test.cpp" << std::endl;
+            return 1;
         }
 
-        // Handle errors
-        if (token.type == TokenType::T_ERROR) {
-            std::cerr << "Error: " << token.value << " at line "
-                      << token.line << ", column " << token.column << std::endl;
+        // Initialize scanner with input file
+        Scanner scanner;
+        if (!scanner.initialize(argv[1])) {
+            std::cerr << "Error: Could not open file '" << argv[1] << "'" << std::endl;
+            return 1;
         }
 
-    } while (token.type != TokenType::T_EOF);
+        std::cout << "=== Scanning and Parsing: " << argv[1] << " ===" << std::endl;
 
-    std::cout << std::string(70, '-') << std::endl;
-    std::cout << "Total tokens processed: " << tokenCount << std::endl;
-    std::cout << "Scanning completed successfully!" << std::endl;
+        // Initialize parser with scanner
+        Parser parser(&scanner);
 
-    return 0;
+        std::cout << "Parsing..." << std::endl;
+
+        // Parse the program and build AST
+        auto ast = parser.parse();
+
+        std::cout << "Parsing completed successfully!" << std::endl;
+        std::cout << "\n=== Abstract Syntax Tree ===" << std::endl;
+
+        // Print the AST
+        parser.printAST(ast);
+
+        std::cout << "\n=== Parsing Summary ===" << std::endl;
+        std::cout << "✓ Lexical analysis completed" << std::endl;
+        std::cout << "✓ Syntax analysis completed" << std::endl;
+        std::cout << "✓ AST generated successfully" << std::endl;
+
+        return 0;
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown error occurred" << std::endl;
+        return 1;
+    }
 }
+
+/*
+Example test files you can create:
+
+1. test_simple.cpp:
+int x = 5 + 3 * 2;
+cout << x;
+
+2. test_control.cpp:
+int x = 10;
+if (x > 5) {
+    cout << "x is greater than 5";
+} else {
+    cout << "x is not greater than 5";
+}
+
+3. test_loop.cpp:
+int i = 0;
+while (i < 10) {
+    cout << i;
+    i = i + 1;
+}
+
+4. test_complex.cpp:
+int a = 5;
+int b = 10;
+int result = (a + b) * 2 - 3;
+cout << "Result: " << result;
+if (result > 20) {
+    cout << "Result is large";
+}
+*/

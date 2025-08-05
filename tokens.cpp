@@ -1,115 +1,175 @@
 #include "tokens.hpp"
 
+// Keywords map
 std::unordered_map<std::string, TokenType> keywords;
 
+// Initialize keywords map
 void initializeKeywords() {
-    keywords = {
-        {"int", TokenType::T_INT},
-        {"float", TokenType::T_FLOAT},
-        {"char", TokenType::T_CHAR},
-        {"double", TokenType::T_DOUBLE},
-        {"bool", TokenType::T_BOOL},
-        {"void", TokenType::T_VOID},
-        {"if", TokenType::T_IF},
-        {"else", TokenType::T_ELSE},
-        {"while", TokenType::T_WHILE},
-        {"for", TokenType::T_FOR},
-        {"return", TokenType::T_RETURN},
-        {"cout", TokenType::T_COUT},
-        {"cin", TokenType::T_CIN},
-        {"endl", TokenType::T_ENDL},
-        {"true", TokenType::T_TRUE},
-        {"false", TokenType::T_FALSE},
-        {"const", TokenType::T_CONST},
-        {"class", TokenType::T_CLASS},
-        {"public", TokenType::T_PUBLIC},
-        {"private", TokenType::T_PRIVATE},
-        {"protected", TokenType::T_PROTECTED},
-        {"namespace", TokenType::T_NAMESPACE},
-        {"std", TokenType::T_STD},
-        {"using", TokenType::T_USING},
-        {"include", TokenType::T_INCLUDE}
-    };
+    if (!keywords.empty()) return; // Already initialized
+
+    // Data types
+    keywords["int"] = TokenType::T_INT;
+    keywords["float"] = TokenType::T_FLOAT;
+    keywords["char"] = TokenType::T_CHAR;
+    keywords["double"] = TokenType::T_DOUBLE;
+    keywords["bool"] = TokenType::T_BOOL;
+    keywords["void"] = TokenType::T_VOID;
+
+    // Control flow
+    keywords["if"] = TokenType::T_IF;
+    keywords["else"] = TokenType::T_ELSE;
+    keywords["while"] = TokenType::T_WHILE;
+    keywords["for"] = TokenType::T_FOR;
+    keywords["return"] = TokenType::T_RETURN;
+
+    // I/O
+    keywords["cout"] = TokenType::T_COUT;
+    keywords["cin"] = TokenType::T_CIN;
+    keywords["endl"] = TokenType::T_ENDL;
+
+    // Boolean literals
+    keywords["true"] = TokenType::T_TRUE;
+    keywords["false"] = TokenType::T_FALSE;
+
+    // Modifiers
+    keywords["const"] = TokenType::T_CONST;
+
+    // Object-oriented
+    keywords["class"] = TokenType::T_CLASS;
+    keywords["public"] = TokenType::T_PUBLIC;
+    keywords["private"] = TokenType::T_PRIVATE;
+    keywords["protected"] = TokenType::T_PROTECTED;
+
+    // Namespace
+    keywords["namespace"] = TokenType::T_NAMESPACE;
+    keywords["std"] = TokenType::T_STD;
+    keywords["using"] = TokenType::T_USING;
+
+    // Preprocessor
+    keywords["include"] = TokenType::T_INCLUDE;
 }
 
+// Function to get token type name as string
 std::string getTokenTypeName(TokenType type) {
     switch (type) {
+        // End of file
         case TokenType::T_EOF: return "EOF";
+
+        // Literals
         case TokenType::T_INTLIT: return "INTEGER_LITERAL";
         case TokenType::T_FLOATLIT: return "FLOAT_LITERAL";
         case TokenType::T_STRINGLIT: return "STRING_LITERAL";
-        case TokenType::T_CHARLIT: return "CHAR_LITERAL";
+        case TokenType::T_CHARLIT: return "CHARACTER_LITERAL";
+
+        // Identifiers and keywords
         case TokenType::T_IDENT: return "IDENTIFIER";
-        case TokenType::T_INT: return "INT";
-        case TokenType::T_FLOAT: return "FLOAT";
-        case TokenType::T_CHAR: return "CHAR";
-        case TokenType::T_DOUBLE: return "DOUBLE";
-        case TokenType::T_BOOL: return "BOOL";
-        case TokenType::T_VOID: return "VOID";
-        case TokenType::T_IF: return "IF";
-        case TokenType::T_ELSE: return "ELSE";
-        case TokenType::T_WHILE: return "WHILE";
-        case TokenType::T_FOR: return "FOR";
-        case TokenType::T_RETURN: return "RETURN";
-        case TokenType::T_COUT: return "COUT";
-        case TokenType::T_CIN: return "CIN";
-        case TokenType::T_ENDL: return "ENDL";
-        case TokenType::T_TRUE: return "TRUE";
-        case TokenType::T_FALSE: return "FALSE";
-        case TokenType::T_CONST: return "CONST";
-        case TokenType::T_CLASS: return "CLASS";
-        case TokenType::T_PUBLIC: return "PUBLIC";
-        case TokenType::T_PRIVATE: return "PRIVATE";
-        case TokenType::T_PROTECTED: return "PROTECTED";
-        case TokenType::T_NAMESPACE: return "NAMESPACE";
-        case TokenType::T_STD: return "STD";
-        case TokenType::T_USING: return "USING";
-        case TokenType::T_INCLUDE: return "INCLUDE";
-        case TokenType::T_PLUS: return "PLUS";
-        case TokenType::T_MINUS: return "MINUS";
-        case TokenType::T_STAR: return "STAR";
-        case TokenType::T_SLASH: return "SLASH";
-        case TokenType::T_PERCENT: return "PERCENT";
-        case TokenType::T_ASSIGN: return "ASSIGN";
-        case TokenType::T_EQ: return "EQ";
-        case TokenType::T_NE: return "NE";
-        case TokenType::T_LT: return "LT";
-        case TokenType::T_GT: return "GT";
-        case TokenType::T_LE: return "LE";
-        case TokenType::T_GE: return "GE";
-        case TokenType::T_AND: return "AND";
-        case TokenType::T_OR: return "OR";
-        case TokenType::T_NOT: return "NOT";
-        case TokenType::T_BITAND: return "BITAND";
-        case TokenType::T_BITOR: return "BITOR";
-        case TokenType::T_BITXOR: return "BITXOR";
-        case TokenType::T_BITNOT: return "BITNOT";
-        case TokenType::T_LSHIFT: return "LSHIFT";
-        case TokenType::T_RSHIFT: return "RSHIFT";
-        case TokenType::T_INCREMENT: return "INCREMENT";
-        case TokenType::T_DECREMENT: return "DECREMENT";
-        case TokenType::T_PLUSEQ: return "PLUSEQ";
-        case TokenType::T_MINUSEQ: return "MINUSEQ";
-        case TokenType::T_STAREQ: return "STAREQ";
-        case TokenType::T_SLASHEQ: return "SLASHEQ";
-        case TokenType::T_ARROW: return "ARROW";
-        case TokenType::T_SCOPE: return "SCOPE";
-        case TokenType::T_SEMICOLON: return "SEMICOLON";
-        case TokenType::T_COMMA: return "COMMA";
-        case TokenType::T_LPAREN: return "LPAREN";
-        case TokenType::T_RPAREN: return "RPAREN";
-        case TokenType::T_LBRACE: return "LBRACE";
-        case TokenType::T_RBRACE: return "RBRACE";
-        case TokenType::T_LBRACKET: return "LBRACKET";
-        case TokenType::T_RBRACKET: return "RBRACKET";
-        case TokenType::T_COLON: return "COLON";
-        case TokenType::T_DOT: return "DOT";
-        case TokenType::T_QUESTION: return "QUESTION";
-        case TokenType::T_HASH: return "HASH";
+
+        // Keywords - Data types
+        case TokenType::T_INT: return "int";
+        case TokenType::T_FLOAT: return "float";
+        case TokenType::T_CHAR: return "char";
+        case TokenType::T_DOUBLE: return "double";
+        case TokenType::T_BOOL: return "bool";
+        case TokenType::T_VOID: return "void";
+
+        // Keywords - Control flow
+        case TokenType::T_IF: return "if";
+        case TokenType::T_ELSE: return "else";
+        case TokenType::T_WHILE: return "while";
+        case TokenType::T_FOR: return "for";
+        case TokenType::T_RETURN: return "return";
+
+        // Keywords - I/O
+        case TokenType::T_COUT: return "cout";
+        case TokenType::T_CIN: return "cin";
+        case TokenType::T_ENDL: return "endl";
+
+        // Keywords - Boolean
+        case TokenType::T_TRUE: return "true";
+        case TokenType::T_FALSE: return "false";
+
+        // Keywords - Modifiers
+        case TokenType::T_CONST: return "const";
+
+        // Keywords - OOP
+        case TokenType::T_CLASS: return "class";
+        case TokenType::T_PUBLIC: return "public";
+        case TokenType::T_PRIVATE: return "private";
+        case TokenType::T_PROTECTED: return "protected";
+
+        // Keywords - Namespace
+        case TokenType::T_NAMESPACE: return "namespace";
+        case TokenType::T_STD: return "std";
+        case TokenType::T_USING: return "using";
+        case TokenType::T_INCLUDE: return "include";
+
+        // Operators - Arithmetic
+        case TokenType::T_PLUS: return "+";
+        case TokenType::T_MINUS: return "-";
+        case TokenType::T_STAR: return "*";
+        case TokenType::T_SLASH: return "/";
+        case TokenType::T_PERCENT: return "%";
+
+        // Operators - Assignment
+        case TokenType::T_ASSIGN: return "=";
+        case TokenType::T_PLUSEQ: return "+=";
+        case TokenType::T_MINUSEQ: return "-=";
+        case TokenType::T_STAREQ: return "*=";
+        case TokenType::T_SLASHEQ: return "/=";
+
+        // Operators - Comparison
+        case TokenType::T_EQ: return "==";
+        case TokenType::T_NE: return "!=";
+        case TokenType::T_LT: return "<";
+        case TokenType::T_GT: return ">";
+        case TokenType::T_LE: return "<=";
+        case TokenType::T_GE: return ">=";
+
+        // Operators - Logical
+        case TokenType::T_AND: return "&&";
+        case TokenType::T_OR: return "||";
+        case TokenType::T_NOT: return "!";
+
+        // Operators - Bitwise
+        case TokenType::T_BITAND: return "&";
+        case TokenType::T_BITOR: return "|";
+        case TokenType::T_BITXOR: return "^";
+        case TokenType::T_BITNOT: return "~";
+        case TokenType::T_LSHIFT: return "<<";
+        case TokenType::T_RSHIFT: return ">>";
+
+        // Operators - Increment/Decrement
+        case TokenType::T_INCREMENT: return "++";
+        case TokenType::T_DECREMENT: return "--";
+
+        // Operators - Special
+        case TokenType::T_ARROW: return "->";
+        case TokenType::T_SCOPE: return "::";
+
+        // Delimiters
+        case TokenType::T_SEMICOLON: return ";";
+        case TokenType::T_COMMA: return ",";
+        case TokenType::T_LPAREN: return "(";
+        case TokenType::T_RPAREN: return ")";
+        case TokenType::T_LBRACE: return "{";
+        case TokenType::T_RBRACE: return "}";
+        case TokenType::T_LBRACKET: return "[";
+        case TokenType::T_RBRACKET: return "]";
+        case TokenType::T_COLON: return ":";
+        case TokenType::T_DOT: return ".";
+        case TokenType::T_QUESTION: return "?";
+
+        // Preprocessor
+        case TokenType::T_HASH: return "#";
+
+        // Special
         case TokenType::T_NEWLINE: return "NEWLINE";
         case TokenType::T_WHITESPACE: return "WHITESPACE";
         case TokenType::T_COMMENT: return "COMMENT";
+
+        // Error
         case TokenType::T_ERROR: return "ERROR";
+
         default: return "UNKNOWN";
     }
 }
