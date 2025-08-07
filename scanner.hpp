@@ -18,20 +18,20 @@ private:
 
 public:
     Scanner();
-    ~Scanner();
+    virtual ~Scanner();  // Make destructor virtual for proper inheritance
 
     // Initialize scanner with input file
     bool initialize(const std::string& filename);
 
-    // Get the next token
-    Token getNextToken();
+    // Get the next token - VIRTUAL so StringScanner can override
+    virtual Token getNextToken();
 
-    // Peek at the next token without consuming it
-    Token peekToken();
+    // Peek at the next token without consuming it - VIRTUAL
+    virtual Token peekToken();
 
-    // Get current position info
-    int getCurrentLine() const { return lineNumber; }
-    int getCurrentColumn() const { return columnNumber; }
+    // Get current position info - VIRTUAL
+    virtual int getCurrentLine() const { return lineNumber; }
+    virtual int getCurrentColumn() const { return columnNumber; }
 
 private:
     // Character handling

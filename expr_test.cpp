@@ -7,7 +7,8 @@
 #include "parser.hpp"
 
 // Simple scanner adapter for string input (for testing expressions)
-class StringScanner {
+// NOW INHERITS FROM Scanner to be compatible with Parser
+class StringScanner : public Scanner {
 private:
     std::istringstream input;
     std::string line;
@@ -22,8 +23,8 @@ public:
         currentChar = pos < line.length() ? line[pos] : '\0';
     }
 
-    // Remove override - check if base class method is virtual
-    Token getNextToken() {
+    // Override the virtual method from Scanner
+    Token getNextToken() override {
         // Skip whitespace
         while (currentChar == ' ' || currentChar == '\t') {
             nextChar();
@@ -48,6 +49,30 @@ public:
         // Operators and punctuation
         return scanOperator();
     }
+
+    // Override peekToken as well
+    Token peekToken() override {
+        // Save current state
+        size_t savedPos = pos;
+        int savedLine = lineNum;
+        int savedCol = colNum;
+        char savedChar = currentChar;
+
+        // Get next token
+        Token token = getNextToken();
+
+        // Restore state
+        pos = savedPos;
+        lineNum = savedLine;
+        colNum = savedCol;
+        currentChar = savedChar;
+
+        return token;
+    }
+
+    // Override position methods
+    int getCurrentLine() const override { return lineNum; }
+    int getCurrentColumn() const override { return colNum; }
 
 private:
     void nextChar() {
