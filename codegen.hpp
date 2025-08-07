@@ -1,11 +1,11 @@
 #ifndef CODEGEN_HPP
 #define CODEGEN_HPP
-
 #include "parser.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <stdexcept>
 
 class CodeGenerator {
@@ -16,17 +16,25 @@ private:
     std::vector<bool> usedRegisters; // Track which registers are in use
     int labelCounter;               // For generating unique labels
 
+    // Variable management
+    std::unordered_map<std::string, int> symbolTable;  // Variable name -> stack offset
+    int stackOffset;                                   // Current stack offset
+
     // Register management
     static const int MAX_REGISTERS = 8;  // Using r8-r15 for temporaries
     static const std::string registers[];
 
+    // Variable management methods
+    void addVariable(const std::string& name);
+    int getVariableOffset(const std::string& name);
+    void loadVariable(int reg, const std::string& name);
+    void storeVariable(const std::string& name, int reg);
+
 public:
     // Constructor - outputs to provided stream
     CodeGenerator(std::ostream* out);
-
     // Constructor - outputs to file
     CodeGenerator(const std::string& filename);
-
     // Destructor
     ~CodeGenerator();
 

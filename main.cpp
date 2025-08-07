@@ -32,22 +32,22 @@ void printUsage(const char* programName) {
 }
 
 void printHeader() {
-    std::cout << "┌─────────────────────────────────────────────────────┐" << std::endl;
-    std::cout << "│           C++ Compiler with Code Generation        │" << std::endl;
-    std::cout << "│                 Part 4: Assembly                   │" << std::endl;
-    std::cout << "│              AST → x86-64 Assembly                 │" << std::endl;
-    std::cout << "└─────────────────────────────────────────────────────┘" << std::endl;
+    std::cout << "+-------------------------------------------------------+" << std::endl;
+    std::cout << "|           C++ Compiler with Code Generation          |" << std::endl;
+    std::cout << "|                 Part 4: Assembly                     |" << std::endl;
+    std::cout << "|              AST -> x86-64 Assembly                  |" << std::endl;
+    std::cout << "+-------------------------------------------------------+" << std::endl;
 }
 
 void printCompilationSteps() {
-    std::cout << "\n┌─ Compilation Pipeline ─┐" << std::endl;
-    std::cout << "│ 1. Lexical Analysis    │ ← Tokenizing" << std::endl;
-    std::cout << "│ 2. Syntax Analysis     │ ← Parsing" << std::endl;
-    std::cout << "│ 3. AST Generation      │ ← Abstract Syntax Tree" << std::endl;
-    std::cout << "│ 4. Code Generation     │ ← x86-64 Assembly" << std::endl;
-    std::cout << "│ 5. Assembly            │ ← as -64 file.s -o file.o" << std::endl;
-    std::cout << "│ 6. Linking             │ ← ld file.o -o executable" << std::endl;
-    std::cout << "└────────────────────────┘" << std::endl;
+    std::cout << "\n+- Compilation Pipeline -+" << std::endl;
+    std::cout << "| 1. Lexical Analysis    | <- Tokenizing" << std::endl;
+    std::cout << "| 2. Syntax Analysis     | <- Parsing" << std::endl;
+    std::cout << "| 3. AST Generation      | <- Abstract Syntax Tree" << std::endl;
+    std::cout << "| 4. Code Generation     | <- x86-64 Assembly" << std::endl;
+    std::cout << "| 5. Assembly            | <- as -64 file.s -o file.o" << std::endl;
+    std::cout << "| 6. Linking             | <- ld file.o -o executable" << std::endl;
+    std::cout << "+------------------------+" << std::endl;
 }
 
 std::string getOutputFilename(const std::string& inputFile, const std::string& outputFile) {
@@ -119,47 +119,47 @@ int main(int argc, char* argv[]) {
         }
 
         if (verbose && !astOnly) {
-            std::cout << "\n📁 Input file: " << inputFile << std::endl;
+            std::cout << "\n[FILE] Input file: " << inputFile << std::endl;
             printCompilationSteps();
-            std::cout << "\n🔍 Phase 1: Lexical Analysis..." << std::endl;
+            std::cout << "\n[PHASE 1] Lexical Analysis..." << std::endl;
         }
 
         // Initialize parser with scanner
         Parser parser(&scanner);
 
         if (verbose && !astOnly) {
-            std::cout << "✓ Lexical analysis completed" << std::endl;
-            std::cout << "\n📊 Phase 2: Syntax Analysis..." << std::endl;
+            std::cout << "[OK] Lexical analysis completed" << std::endl;
+            std::cout << "\n[PHASE 2] Syntax Analysis..." << std::endl;
         }
 
         std::unique_ptr<ASTNode> ast;
 
         if (exprOnly) {
             if (verbose && !astOnly) {
-                std::cout << "📊 Parsing as expression only..." << std::endl;
+                std::cout << "[PARSE] Parsing as expression only..." << std::endl;
             }
             ast = parser.parseExpressionOnly();
         } else {
             if (verbose && !astOnly) {
-                std::cout << "📊 Parsing as complete program..." << std::endl;
+                std::cout << "[PARSE] Parsing as complete program..." << std::endl;
             }
             ast = parser.parse();
         }
 
         if (verbose && !astOnly) {
-            std::cout << "✓ Syntax analysis completed" << std::endl;
-            std::cout << "\n🌳 Phase 3: AST Generation completed" << std::endl;
+            std::cout << "[OK] Syntax analysis completed" << std::endl;
+            std::cout << "\n[PHASE 3] AST Generation completed" << std::endl;
         }
 
         if (!astOnly && !parseOnly) {
             if (verbose) {
-                std::cout << "\n🔧 Phase 4: Code Generation..." << std::endl;
+                std::cout << "\n[PHASE 4] Code Generation..." << std::endl;
             }
 
             // Determine output location
             if (toStdout) {
                 if (verbose) {
-                    std::cout << "📤 Generating assembly code to stdout" << std::endl;
+                    std::cout << "[OUTPUT] Generating assembly code to stdout" << std::endl;
                     std::cout << "\n" << std::string(50, '=') << std::endl;
                     std::cout << "GENERATED ASSEMBLY CODE:" << std::endl;
                     std::cout << std::string(50, '=') << std::endl;
@@ -172,17 +172,17 @@ int main(int argc, char* argv[]) {
                 std::string finalOutputFile = getOutputFilename(inputFile, outputFile);
 
                 if (verbose) {
-                    std::cout << "📤 Output file: " << finalOutputFile << std::endl;
-                    std::cout << "🔧 Generating x86-64 assembly code..." << std::endl;
+                    std::cout << "[OUTPUT] Output file: " << finalOutputFile << std::endl;
+                    std::cout << "[CODEGEN] Generating x86-64 assembly code..." << std::endl;
                 }
 
                 CodeGenerator codegen(finalOutputFile);
                 codegen.generateCode(ast);
 
                 if (verbose) {
-                    std::cout << "✓ Code generation completed" << std::endl;
+                    std::cout << "[OK] Code generation completed" << std::endl;
 
-                    std::cout << "\n🚀 Next Steps:" << std::endl;
+                    std::cout << "\n[NEXT STEPS]:" << std::endl;
                     std::cout << "   1. Assemble:  as -64 " << finalOutputFile << " -o " <<
                                  finalOutputFile.substr(0, finalOutputFile.find_last_of('.')) << ".o" << std::endl;
                     std::cout << "   2. Link:      ld " <<
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
                                  finalOutputFile.substr(0, finalOutputFile.find_last_of('.')) << std::endl;
                     std::cout << "   4. Check:     echo $?  # Shows exit code (result)" << std::endl;
                 } else {
-                    std::cout << "✅ Assembly generated: " << finalOutputFile << std::endl;
+                    std::cout << "[OK] Assembly generated: " << finalOutputFile << std::endl;
                 }
             }
         }
@@ -200,20 +200,20 @@ int main(int argc, char* argv[]) {
         // Always show AST if requested or if verbose
         if (astOnly || verbose || parseOnly) {
             if (!astOnly && !parseOnly) {
-                std::cout << "\n🌳 Abstract Syntax Tree:" << std::endl;
-                std::cout << "────────────────────────────────" << std::endl;
+                std::cout << "\n[AST] Abstract Syntax Tree:" << std::endl;
+                std::cout << std::string(32, '-') << std::endl;
             }
             parser.printAST(ast);
         }
 
         if (!astOnly && !parseOnly && !verbose) {
-            std::cout << "\n✅ Compilation completed successfully!" << std::endl;
+            std::cout << "\n[SUCCESS] Compilation completed successfully!" << std::endl;
 
             if (!toStdout) {
                 std::string finalOutputFile = getOutputFilename(inputFile, outputFile);
-                std::cout << "📁 Assembly file generated: " << finalOutputFile << std::endl;
+                std::cout << "[FILE] Assembly file generated: " << finalOutputFile << std::endl;
 
-                std::cout << "\n📋 To assemble and run:" << std::endl;
+                std::cout << "\n[USAGE] To assemble and run:" << std::endl;
                 std::cout << "   as -64 " << finalOutputFile << " -o output.o && " <<
                              "ld output.o -o output && ./output; echo \"Exit code: $?\"" << std::endl;
             }
@@ -221,28 +221,27 @@ int main(int argc, char* argv[]) {
 
         if (verbose && !astOnly && !parseOnly) {
             std::cout << "\n" << std::string(50, '-') << std::endl;
-           // std::cout << "\n" << std::string(50, '─') << std::endl;
-            std::cout << "📊 Compilation Summary:" << std::endl;
-            std::cout << "   ✓ Lexical analysis (tokenizing)" << std::endl;
-            std::cout << "   ✓ Syntax analysis (parsing)" << std::endl;
-            std::cout << "   ✓ AST generation" << std::endl;
-            std::cout << "   ✓ Code generation (x86-64 assembly)" << std::endl;
+            std::cout << "[SUMMARY] Compilation Summary:" << std::endl;
+            std::cout << "   [OK] Lexical analysis (tokenizing)" << std::endl;
+            std::cout << "   [OK] Syntax analysis (parsing)" << std::endl;
+            std::cout << "   [OK] AST generation" << std::endl;
+            std::cout << "   [OK] Code generation (x86-64 assembly)" << std::endl;
 
-            std::cout << "\n💡 Compiler Features:" << std::endl;
-            std::cout << "   • Pratt parser for operator precedence" << std::endl;
-            std::cout << "   • x86-64 assembly code generation" << std::endl;
-            std::cout << "   • Register allocation and management" << std::endl;
-            std::cout << "   • Binary and unary operator support" << std::endl;
-            std::cout << "   • Integer and float literal support" << std::endl;
+            std::cout << "\n[FEATURES] Compiler Features:" << std::endl;
+            std::cout << "   * Pratt parser for operator precedence" << std::endl;
+            std::cout << "   * x86-64 assembly code generation" << std::endl;
+            std::cout << "   * Register allocation and management" << std::endl;
+            std::cout << "   * Binary and unary operator support" << std::endl;
+            std::cout << "   * Integer and float literal support" << std::endl;
         }
 
         return 0;
 
     } catch (const std::exception& e) {
-        std::cerr << "❌ Error: " << e.what() << std::endl;
+        std::cerr << "[ERROR] " << e.what() << std::endl;
         return 1;
     } catch (...) {
-        std::cerr << "❌ Unknown error occurred" << std::endl;
+        std::cerr << "[ERROR] Unknown error occurred" << std::endl;
         return 1;
     }
 }

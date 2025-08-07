@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <unordered_map>
 
 // x86-64 registers we'll use for temporaries (r8-r15)
 const std::string CodeGenerator::registers[] = {
@@ -10,12 +11,12 @@ const std::string CodeGenerator::registers[] = {
 };
 
 CodeGenerator::CodeGenerator(std::ostream* out)
-    : output(out), ownsStream(false), nextRegister(0), labelCounter(0) {
+    : output(out), ownsStream(false), nextRegister(0), labelCounter(0), stackOffset(0) {
     usedRegisters.resize(MAX_REGISTERS, false);
 }
 
 CodeGenerator::CodeGenerator(const std::string& filename)
-    : ownsStream(true), nextRegister(0), labelCounter(0) {
+    : ownsStream(true), nextRegister(0), labelCounter(0), stackOffset(0) {
     output = new std::ofstream(filename);
     if (!static_cast<std::ofstream*>(output)->is_open()) {
         delete output;
@@ -93,6 +94,37 @@ void CodeGenerator::loadImmediate(int reg, float value) {
     emit("movq $" + std::to_string(static_cast<int>(value)) + ", " + getRegisterName(reg));
 }
 
+// Symbol table management
+void CodeGenerator::addVariable(const std::string& name) {
+    if (symbolTable.find(name) != symbolTable.end()) {
+        error("Variable '" + name + "' already declared");
+    }
+
+    stackOffset -= 8;  // Each variable takes 8 bytes (64-bit)
+    symbolTable[name] = stackOffset;
+    emitComment("Variable '" + name + "' allocated at offset " + std::to_string(stackOffset));
+}
+
+int CodeGenerator::getVariableOffset(const std::string& name) {
+    auto it = symbolTable.find(name);
+    if (it == symbolTable.end()) {
+        error("Variable '" + name + "' not declared");
+    }
+    return it->second;
+}
+
+void CodeGenerator::loadVariable(int reg, const std::string& name) {
+    int offset = getVariableOffset(name);
+    emit("movq " + std::to_string(offset) + "(%rbp), " + getRegisterName(reg));
+    emitComment("Load variable '" + name + "'");
+}
+
+void CodeGenerator::storeVariable(const std::string& name, int reg) {
+    int offset = getVariableOffset(name);
+    emit("movq " + getRegisterName(reg) + ", " + std::to_string(offset) + "(%rbp)");
+    emitComment("Store to variable '" + name + "'");
+}
+
 void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) {
     std::string leftRegName = getRegisterName(leftReg);
     std::string rightRegName = getRegisterName(rightReg);
@@ -111,19 +143,27 @@ void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) 
             break;
 
         case ASTNodeType::DIVIDE:
-            // x86-64 division is more complex - move to rax, sign extend, divide
+            // x86-64 division - save registers that might be used
+            emit("pushq %rax");           // Save rax
+            emit("pushq %rdx");           // Save rdx
             emit("movq " + leftRegName + ", %rax");
-            emit("cqto");  // Sign extend rax to rdx:rax
+            emit("cqto");                 // Sign extend rax to rdx:rax
             emit("idivq " + rightRegName);
             emit("movq %rax, " + leftRegName);  // Move result back
+            emit("popq %rdx");            // Restore rdx
+            emit("popq %rax");            // Restore rax
             break;
 
         case ASTNodeType::MODULO:
             // Similar to division, but result is in rdx
+            emit("pushq %rax");           // Save rax
+            emit("pushq %rdx");           // Save rdx
             emit("movq " + leftRegName + ", %rax");
             emit("cqto");
             emit("idivq " + rightRegName);
             emit("movq %rdx, " + leftRegName);  // Move remainder back
+            emit("popq %rdx");            // Restore rdx
+            emit("popq %rax");            // Restore rax
             break;
 
         case ASTNodeType::EQ:
@@ -163,28 +203,38 @@ void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) 
             break;
 
         case ASTNodeType::AND: {
-            // Logical AND - if left is 0, result is 0; otherwise result is right
+            // Logical AND - if left is 0, result is 0; otherwise result is right != 0
             emit("testq " + leftRegName + ", " + leftRegName);
-            std::string andLabel = generateLabel("and_");
+            std::string andZeroLabel = generateLabel("and_zero_");
             std::string endLabel = generateLabel("end_and_");
-            emit("jz " + andLabel);  // Jump if left is 0
-            emit("movq " + rightRegName + ", " + leftRegName);
+            emit("jz " + andZeroLabel);  // Jump if left is 0
+
+            // Left is non-zero, so result depends on right
+            emit("testq " + rightRegName + ", " + rightRegName);
+            emit("setnz %al");
+            emit("movzbq %al, " + leftRegName);
             emit("jmp " + endLabel);
-            emitLabel(andLabel);
+
+            emitLabel(andZeroLabel);
             emit("movq $0, " + leftRegName);
             emitLabel(endLabel);
             break;
         }
 
         case ASTNodeType::OR: {
-            // Logical OR - if left is non-zero, result is 1; otherwise result is right
+            // Logical OR - if left is non-zero, result is 1; otherwise result is right != 0
             emit("testq " + leftRegName + ", " + leftRegName);
-            std::string orLabel = generateLabel("or_");
+            std::string orOneLabel = generateLabel("or_one_");
             std::string endOrLabel = generateLabel("end_or_");
-            emit("jnz " + orLabel);  // Jump if left is non-zero
-            emit("movq " + rightRegName + ", " + leftRegName);
+            emit("jnz " + orOneLabel);  // Jump if left is non-zero
+
+            // Left is zero, so result depends on right
+            emit("testq " + rightRegName + ", " + rightRegName);
+            emit("setnz %al");
+            emit("movzbq %al, " + leftRegName);
             emit("jmp " + endOrLabel);
-            emitLabel(orLabel);
+
+            emitLabel(orOneLabel);
             emit("movq $1, " + leftRegName);
             emitLabel(endOrLabel);
             break;
@@ -241,12 +291,31 @@ int CodeGenerator::generateExpression(const std::unique_ptr<ASTNode>& node) {
         }
 
         case ASTNodeType::IDENTIFIER: {
-            // For now, we'll treat identifiers as 0 (undefined variables)
-            // In a real compiler, you'd look up the variable in a symbol table
             int reg = allocateRegister();
-            loadImmediate(reg, 0);
-            emitComment("Load identifier (as 0): " + node->value);
+            loadVariable(reg, node->value);
             return reg;
+        }
+
+        case ASTNodeType::ASSIGN: {
+            if (!node->left || !node->right) {
+                error("Assignment missing operands");
+                return -1;
+            }
+
+            // The left side should be an identifier
+            if (node->left->type != ASTNodeType::IDENTIFIER) {
+                error("Left side of assignment must be a variable");
+                return -1;
+            }
+
+            // Generate code for the right side (the value to assign)
+            int valueReg = generateExpression(node->right);
+
+            // Store the value to the variable
+            storeVariable(node->left->value, valueReg);
+
+            // Assignment expression returns the assigned value
+            return valueReg;
         }
 
         // Binary operations
@@ -316,6 +385,14 @@ void CodeGenerator::generateStatement(const std::unique_ptr<ASTNode>& node) {
     if (!node) return;
 
     switch (node->type) {
+        case ASTNodeType::VAR_DECL: {
+            // Variable declaration - just add to symbol table
+            if (!node->value.empty()) {
+                addVariable(node->value);
+            }
+            break;
+        }
+
         case ASTNodeType::EXPRESSION_STMT: {
             if (node->left) {
                 int reg = generateExpression(node->left);
@@ -332,7 +409,6 @@ void CodeGenerator::generateStatement(const std::unique_ptr<ASTNode>& node) {
         }
 
         // For now, we'll ignore other statement types
-        case ASTNodeType::VAR_DECL:
         case ASTNodeType::COUT_STMT:
         case ASTNodeType::CIN_STMT:
         case ASTNodeType::IF_STMT:
@@ -358,46 +434,77 @@ void CodeGenerator::generateProgram(const std::unique_ptr<ASTNode>& node) {
 
     // If the program has children (statements), generate them
     if (!node->children.empty()) {
+        // For a program with statements, evaluate the last expression statement
+        // and use its result as the exit code
+        int lastExpressionReg = -1;
+
         for (const auto& child : node->children) {
-            generateStatement(child);
+            if (child->type == ASTNodeType::EXPRESSION_STMT && child->left) {
+                // Free the previous expression result if any
+                if (lastExpressionReg != -1) {
+                    freeRegister(lastExpressionReg);
+                }
+                // Generate the expression and keep its result
+                lastExpressionReg = generateExpression(child->left);
+            } else {
+                generateStatement(child);
+            }
         }
-        // Exit with code 0
-        generatePostamble(0);
+
+        // Use the last expression's result as exit code, or 0 if none
+        if (lastExpressionReg != -1) {
+            emit("movq " + getRegisterName(lastExpressionReg) + ", %rax");
+            freeRegister(lastExpressionReg);
+            generatePostamble(-1);  // -1 means exit code is already in %rax
+        } else {
+            generatePostamble(0);
+        }
     } else {
         // If it's just an expression, evaluate it and exit with its value
         emitComment("Single expression program");
         if (node->left) {
             int reg = generateExpression(node->left);
-            emit("movq " + getRegisterName(reg) + ", %rdi");  // Move result to exit code
+            emit("movq " + getRegisterName(reg) + ", %rax");  // Move result to return value
             freeRegister(reg);
+            generatePostamble(-1);  // -1 means exit code is already in %rax
+        } else {
+            generatePostamble(0);
         }
-        generatePostamble();
     }
 }
 
 void CodeGenerator::generatePreamble() {
     *output << "# Generated by C++ Compiler - Code Generation Phase" << std::endl;
-    *output << "# x86-64 Assembly Output" << std::endl;
+    *output << "# x86-64 Assembly Output for Windows (MinGW64)" << std::endl;
     *output << std::endl;
 
-    *output << ".section .text" << std::endl;
-    *output << ".global _start" << std::endl;
+    // Windows-compatible assembly using main instead of _start
+    *output << ".text" << std::endl;
+    *output << ".globl main" << std::endl;
     *output << std::endl;
 
-    emitLabel("_start");
+    emitLabel("main");
     emitComment("Program start");
+
+    // Set up stack frame for Windows calling convention
+    emit("pushq %rbp");
+    emit("movq %rsp, %rbp");
+    emit("subq $32, %rsp");  // Shadow space for Windows x64 calling convention
 }
 
 void CodeGenerator::generatePostamble(int exitCode) {
     emitComment("Program exit");
 
     if (exitCode != -1) {
-        emit("movq $" + std::to_string(exitCode) + ", %rdi");
+        emit("movq $" + std::to_string(exitCode) + ", %rax");
     }
-    // If exitCode is -1, assume the exit code is already in %rdi
+    // If exitCode is -1, assume the exit code is already in %rax
 
-    emit("movq $60, %rax");    // sys_exit system call number
-    emit("syscall");           // invoke system call
+    // Clean up stack frame
+    emit("addq $32, %rsp");
+    emit("movq %rbp, %rsp");
+    emit("popq %rbp");
+    emit("ret");  // Return instead of syscall
 }
 
 void CodeGenerator::generateCode(const std::unique_ptr<ASTNode>& ast) {
@@ -409,6 +516,8 @@ void CodeGenerator::generateCode(const std::unique_ptr<ASTNode>& ast) {
     // Reset state
     freeAllRegisters();
     labelCounter = 0;
+    stackOffset = 0;
+    symbolTable.clear();
 
     if (ast->type == ASTNodeType::PROGRAM) {
         generateProgram(ast);
@@ -417,8 +526,8 @@ void CodeGenerator::generateCode(const std::unique_ptr<ASTNode>& ast) {
         generatePreamble();
         emitComment("Single expression evaluation");
         int reg = generateExpression(ast);
-        emit("movq " + getRegisterName(reg) + ", %rdi");  // Move result to exit code
-        generatePostamble();
+        emit("movq " + getRegisterName(reg) + ", %rax");  // Move result to return value
+        generatePostamble(-1);  // -1 means exit code is already in %rax
         freeRegister(reg);
     }
 }
