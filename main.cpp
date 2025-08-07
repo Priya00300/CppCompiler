@@ -220,7 +220,8 @@ int main(int argc, char* argv[]) {
         }
 
         if (verbose && !astOnly && !parseOnly) {
-            std::cout << "\n" << std::string(50, '─') << std::endl;
+            std::cout << "\n" << std::string(50, '-') << std::endl;
+           // std::cout << "\n" << std::string(50, '─') << std::endl;
             std::cout << "📊 Compilation Summary:" << std::endl;
             std::cout << "   ✓ Lexical analysis (tokenizing)" << std::endl;
             std::cout << "   ✓ Syntax analysis (parsing)" << std::endl;

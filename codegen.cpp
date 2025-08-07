@@ -162,7 +162,7 @@ void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) 
             emit("movzbq %al, " + leftRegName);
             break;
 
-        case ASTNodeType::AND:
+        case ASTNodeType::AND: {
             // Logical AND - if left is 0, result is 0; otherwise result is right
             emit("testq " + leftRegName + ", " + leftRegName);
             std::string andLabel = generateLabel("and_");
@@ -174,8 +174,9 @@ void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) 
             emit("movq $0, " + leftRegName);
             emitLabel(endLabel);
             break;
+        }
 
-        case ASTNodeType::OR:
+        case ASTNodeType::OR: {
             // Logical OR - if left is non-zero, result is 1; otherwise result is right
             emit("testq " + leftRegName + ", " + leftRegName);
             std::string orLabel = generateLabel("or_");
@@ -187,6 +188,7 @@ void CodeGenerator::generateBinaryOp(ASTNodeType op, int leftReg, int rightReg) 
             emit("movq $1, " + leftRegName);
             emitLabel(endOrLabel);
             break;
+        }
 
         default:
             error("Unsupported binary operation");
@@ -295,9 +297,9 @@ int CodeGenerator::generateExpression(const std::unique_ptr<ASTNode>& node) {
 
             int reg = generateExpression(node->left);
 
-            emitComment("Unary operation: " +
+            emitComment(std::string("Unary operation: ") +
                        (node->type == ASTNodeType::NEGATE ? "-" :
-                        node->type == ASTNodeType::POSITIVE ? "+" : "!") +
+                        node->type == ASTNodeType::POSITIVE ? "+" : "!") + " " +
                        getRegisterName(reg));
 
             generateUnaryOp(node->type, reg);
