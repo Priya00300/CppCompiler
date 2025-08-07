@@ -17,7 +17,7 @@ enum class ASTNodeType {
     CHARLIT,
     IDENTIFIER,
 
-    // Binary Operations
+    // Binary Operations - Arithmetic
     ADD,
     SUBTRACT,
     MULTIPLY,
@@ -94,6 +94,9 @@ private:
     Token currentToken;
     bool hasCurrentToken;
 
+    // Operator precedence table - higher numbers = higher precedence
+    static const int precedenceTable[];
+
     // Error handling
     void error(const std::string& message);
     void unexpectedToken(const std::string& expected = "");
@@ -110,10 +113,18 @@ private:
                                            std::unique_ptr<ASTNode> right);
     std::unique_ptr<ASTNode> makeUnaryNode(ASTNodeType type, std::unique_ptr<ASTNode> child);
 
-    // Convert token type to AST node type
+    // Precedence and operator handling
+    int getOperatorPrecedence(TokenType tokenType);
+    bool isOperator(TokenType tokenType);
+    bool isRightAssociative(TokenType tokenType);
     ASTNodeType tokenToASTType(TokenType tokenType);
 
-    // Parsing methods (recursive descent parser)
+    // Pratt parsing - core expression parsing
+    std::unique_ptr<ASTNode> parseExpression(int minPrecedence = 0);
+    std::unique_ptr<ASTNode> parsePrimaryExpression();
+    std::unique_ptr<ASTNode> parseUnaryExpression();
+
+    // Statement parsing methods
     std::unique_ptr<ASTNode> parseProgram();
     std::unique_ptr<ASTNode> parseStatement();
     std::unique_ptr<ASTNode> parseExpressionStatement();
@@ -126,18 +137,6 @@ private:
     std::unique_ptr<ASTNode> parseReturnStatement();
     std::unique_ptr<ASTNode> parseCompoundStatement();
 
-    // Expression parsing with precedence
-    std::unique_ptr<ASTNode> parseExpression();
-    std::unique_ptr<ASTNode> parseAssignmentExpression();
-    std::unique_ptr<ASTNode> parseLogicalOrExpression();
-    std::unique_ptr<ASTNode> parseLogicalAndExpression();
-    std::unique_ptr<ASTNode> parseEqualityExpression();
-    std::unique_ptr<ASTNode> parseRelationalExpression();
-    std::unique_ptr<ASTNode> parseAdditiveExpression();
-    std::unique_ptr<ASTNode> parseMultiplicativeExpression();
-    std::unique_ptr<ASTNode> parseUnaryExpression();
-    std::unique_ptr<ASTNode> parsePrimaryExpression();
-
 public:
     Parser(Scanner* scan);
     ~Parser() = default;
@@ -148,6 +147,9 @@ public:
     // Debug and utility methods
     void printAST(const std::unique_ptr<ASTNode>& node, int indent = 0);
     std::string astNodeTypeToString(ASTNodeType type);
+
+    // Test expression parsing specifically
+    std::unique_ptr<ASTNode> parseExpressionOnly();
 };
 
 #endif // PARSER_HPP

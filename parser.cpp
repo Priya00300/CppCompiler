@@ -2,6 +2,111 @@
 #include <iostream>
 #include <iomanip>
 
+// Operator precedence table - follows C++ operator precedence
+// Higher numbers = higher precedence
+const int Parser::precedenceTable[] = {
+    0,   // T_EOF
+    0,   // T_INTLIT
+    0,   // T_FLOATLIT
+    0,   // T_STRINGLIT
+    0,   // T_CHARLIT
+    0,   // T_IDENT
+
+    // Data types
+    0,   // T_INT
+    0,   // T_FLOAT
+    0,   // T_CHAR
+    0,   // T_DOUBLE
+    0,   // T_BOOL
+    0,   // T_VOID
+
+    // Keywords
+    0,   // T_IF
+    0,   // T_ELSE
+    0,   // T_WHILE
+    0,   // T_FOR
+    0,   // T_RETURN
+    0,   // T_COUT
+    0,   // T_CIN
+    0,   // T_ENDL
+    0,   // T_TRUE
+    0,   // T_FALSE
+    0,   // T_CONST
+    0,   // T_CLASS
+    0,   // T_PUBLIC
+    0,   // T_PRIVATE
+    0,   // T_PROTECTED
+    0,   // T_NAMESPACE
+    0,   // T_STD
+    0,   // T_USING
+    0,   // T_INCLUDE
+
+    // Arithmetic operators (precedence 10-40)
+    30,  // T_PLUS      +
+    30,  // T_MINUS     -
+    40,  // T_STAR      *
+    40,  // T_SLASH     /
+    40,  // T_PERCENT   %
+
+    // Assignment (precedence 2)
+    2,   // T_ASSIGN    =
+
+    // Comparison operators (precedence 20-25)
+    20,  // T_EQ        ==
+    20,  // T_NE        !=
+    25,  // T_LT        <
+    25,  // T_GT        >
+    25,  // T_LE        <=
+    25,  // T_GE        >=
+
+    // Logical operators (precedence 5-15)
+    5,   // T_AND       &&
+    3,   // T_OR        ||
+    0,   // T_NOT       ! (unary)
+
+    // Bitwise operators (precedence 15-35)
+    15,  // T_BITAND    &
+    13,  // T_BITOR     |
+    14,  // T_BITXOR    ^
+    0,   // T_BITNOT    ~ (unary)
+    35,  // T_LSHIFT    <<
+    35,  // T_RSHIFT    >>
+
+    // Increment/Decrement (precedence 50)
+    50,  // T_INCREMENT ++
+    50,  // T_DECREMENT --
+
+    // Compound assignment (precedence 2)
+    2,   // T_PLUSEQ    +=
+    2,   // T_MINUSEQ   -=
+    2,   // T_STAREQ    *=
+    2,   // T_SLASHEQ   /=
+
+    // Special operators
+    0,   // T_ARROW     ->
+    0,   // T_SCOPE     ::
+
+    // Delimiters
+    0,   // T_SEMICOLON ;
+    0,   // T_COMMA     ,
+    0,   // T_LPAREN    (
+    0,   // T_RPAREN    )
+    0,   // T_LBRACE    {
+    0,   // T_RBRACE    }
+    0,   // T_LBRACKET  [
+    0,   // T_RBRACKET  ]
+    0,   // T_COLON     :
+    0,   // T_DOT       .
+    0,   // T_QUESTION  ?
+
+    // Special tokens
+    0,   // T_HASH      #
+    0,   // T_NEWLINE
+    0,   // T_WHITESPACE
+    0,   // T_COMMENT
+    0    // T_ERROR
+};
+
 Parser::Parser(Scanner* scan) : scanner(scan), hasCurrentToken(false) {
     // Initialize keywords if not already done
     initializeKeywords();
@@ -61,6 +166,29 @@ std::unique_ptr<ASTNode> Parser::makeUnaryNode(ASTNodeType type, std::unique_ptr
     return std::make_unique<ASTNode>(type, std::move(child));
 }
 
+int Parser::getOperatorPrecedence(TokenType tokenType) {
+    int tokenIndex = static_cast<int>(tokenType);
+    size_t tableSize = sizeof(precedenceTable) / sizeof(precedenceTable[0]);
+
+    if (tokenIndex >= 0 && static_cast<size_t>(tokenIndex) < tableSize) {
+        return precedenceTable[tokenIndex];
+    }
+    return 0;
+}
+
+bool Parser::isOperator(TokenType tokenType) {
+    return getOperatorPrecedence(tokenType) > 0;
+}
+
+bool Parser::isRightAssociative(TokenType tokenType) {
+    // Assignment operators are right-associative
+    return tokenType == TokenType::T_ASSIGN ||
+           tokenType == TokenType::T_PLUSEQ ||
+           tokenType == TokenType::T_MINUSEQ ||
+           tokenType == TokenType::T_STAREQ ||
+           tokenType == TokenType::T_SLASHEQ;
+}
+
 ASTNodeType Parser::tokenToASTType(TokenType tokenType) {
     switch (tokenType) {
         case TokenType::T_PLUS:     return ASTNodeType::ADD;
@@ -78,7 +206,7 @@ ASTNodeType Parser::tokenToASTType(TokenType tokenType) {
         case TokenType::T_AND:      return ASTNodeType::AND;
         case TokenType::T_OR:       return ASTNodeType::OR;
         default:
-            error("Invalid token type for AST conversion");
+            error("Invalid token type for AST conversion: " + getTokenTypeName(tokenType));
             return ASTNodeType::ADD; // This won't be reached due to error
     }
 }
@@ -88,317 +216,36 @@ std::unique_ptr<ASTNode> Parser::parse() {
     return parseProgram();
 }
 
-std::unique_ptr<ASTNode> Parser::parseProgram() {
-    auto program = makeLeafNode(ASTNodeType::PROGRAM);
-
-    while (currentToken.type != TokenType::T_EOF) {
-        try {
-            auto stmt = parseStatement();
-            if (stmt) {
-                program->children.push_back(std::move(stmt));
-            }
-        } catch (const std::runtime_error& e) {
-            // Skip to next statement on error
-            while (currentToken.type != TokenType::T_SEMICOLON &&
-                   currentToken.type != TokenType::T_EOF) {
-                nextToken();
-            }
-            if (currentToken.type == TokenType::T_SEMICOLON) {
-                nextToken();
-            }
-        }
-    }
-
-    return program;
-}
-
-std::unique_ptr<ASTNode> Parser::parseStatement() {
-    switch (currentToken.type) {
-        case TokenType::T_INT:
-        case TokenType::T_FLOAT:
-        case TokenType::T_CHAR:
-        case TokenType::T_DOUBLE:
-        case TokenType::T_BOOL:
-            return parseDeclaration();
-
-        case TokenType::T_COUT:
-            return parseCoutStatement();
-
-        case TokenType::T_CIN:
-            return parseCinStatement();
-
-        case TokenType::T_IF:
-            return parseIfStatement();
-
-        case TokenType::T_WHILE:
-            return parseWhileStatement();
-
-        case TokenType::T_FOR:
-            return parseForStatement();
-
-        case TokenType::T_RETURN:
-            return parseReturnStatement();
-
-        case TokenType::T_LBRACE:
-            return parseCompoundStatement();
-
-        default:
-            return parseExpressionStatement();
-    }
-}
-
-std::unique_ptr<ASTNode> Parser::parseExpressionStatement() {
-    auto expr = parseExpression();
-    expectToken(TokenType::T_SEMICOLON);
-    return makeUnaryNode(ASTNodeType::EXPRESSION_STMT, std::move(expr));
-}
-
-std::unique_ptr<ASTNode> Parser::parseDeclaration() {
-    nextToken(); // consume type token
-
-    if (currentToken.type != TokenType::T_IDENT) {
-        unexpectedToken("identifier");
-    }
-
-    std::string varName = currentToken.value;
-    nextToken(); // consume identifier
-
-    auto decl = makeLeafNode(ASTNodeType::VAR_DECL, varName);
-
-    // Check for initialization
-    if (matchToken(TokenType::T_ASSIGN)) {
-        auto initExpr = parseExpression();
-        decl->left = std::move(initExpr);
-    }
-
-    expectToken(TokenType::T_SEMICOLON);
-    return decl;
-}
-std::unique_ptr<ASTNode> Parser::parseCoutStatement() {
-    expectToken(TokenType::T_COUT);
-
-    auto coutStmt = makeLeafNode(ASTNodeType::COUT_STMT);
-
-    while (currentToken.type == TokenType::T_LSHIFT) {
-        nextToken(); // consume <<
-        auto expr = parseExpression();
-        coutStmt->children.push_back(std::move(expr));
-    }
-
-    expectToken(TokenType::T_SEMICOLON);
-    return coutStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseCinStatement() {
-    expectToken(TokenType::T_CIN);
-
-    auto cinStmt = makeLeafNode(ASTNodeType::CIN_STMT);
-
-    while (currentToken.type == TokenType::T_RSHIFT) {
-        nextToken(); // consume >>
-        auto expr = parseExpression();
-        cinStmt->children.push_back(std::move(expr));
-    }
-
-    expectToken(TokenType::T_SEMICOLON);
-    return cinStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseIfStatement() {
-    expectToken(TokenType::T_IF);
-    expectToken(TokenType::T_LPAREN);
-
-    auto condition = parseExpression();
-    expectToken(TokenType::T_RPAREN);
-
-    auto thenStmt = parseStatement();
-
-    auto ifStmt = makeLeafNode(ASTNodeType::IF_STMT);
-    ifStmt->children.push_back(std::move(condition));
-    ifStmt->children.push_back(std::move(thenStmt));
-
-    if (matchToken(TokenType::T_ELSE)) {
-        auto elseStmt = parseStatement();
-        ifStmt->children.push_back(std::move(elseStmt));
-    }
-
-    return ifStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseWhileStatement() {
-    expectToken(TokenType::T_WHILE);
-    expectToken(TokenType::T_LPAREN);
-
-    auto condition = parseExpression();
-    expectToken(TokenType::T_RPAREN);
-
-    auto body = parseStatement();
-
-    auto whileStmt = makeLeafNode(ASTNodeType::WHILE_STMT);
-    whileStmt->children.push_back(std::move(condition));
-    whileStmt->children.push_back(std::move(body));
-
-    return whileStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseForStatement() {
-    expectToken(TokenType::T_FOR);
-    expectToken(TokenType::T_LPAREN);
-
-    auto forStmt = makeLeafNode(ASTNodeType::FOR_STMT);
-
-    // Initialization
-    if (currentToken.type != TokenType::T_SEMICOLON) {
-        forStmt->children.push_back(parseExpression());
-    }
-    expectToken(TokenType::T_SEMICOLON);
-
-    // Condition
-    if (currentToken.type != TokenType::T_SEMICOLON) {
-        forStmt->children.push_back(parseExpression());
-    }
-    expectToken(TokenType::T_SEMICOLON);
-
-    // Update
-    if (currentToken.type != TokenType::T_RPAREN) {
-        forStmt->children.push_back(parseExpression());
-    }
-    expectToken(TokenType::T_RPAREN);
-
-    // Body
-    forStmt->children.push_back(parseStatement());
-
-    return forStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseReturnStatement() {
-    expectToken(TokenType::T_RETURN);
-
-    auto returnStmt = makeLeafNode(ASTNodeType::RETURN_STMT);
-
-    if (currentToken.type != TokenType::T_SEMICOLON) {
-        returnStmt->left = parseExpression();
-    }
-
-    expectToken(TokenType::T_SEMICOLON);
-    return returnStmt;
-}
-
-std::unique_ptr<ASTNode> Parser::parseCompoundStatement() {
-    expectToken(TokenType::T_LBRACE);
-
-    auto compound = makeLeafNode(ASTNodeType::COMPOUND_STMT);
-
-    while (currentToken.type != TokenType::T_RBRACE && currentToken.type != TokenType::T_EOF) {
-        auto stmt = parseStatement();
-        if (stmt) {
-            compound->children.push_back(std::move(stmt));
-        }
-    }
-
-    expectToken(TokenType::T_RBRACE);
-    return compound;
-}
-
-// Expression parsing with operator precedence
-std::unique_ptr<ASTNode> Parser::parseExpression() {
-    return parseAssignmentExpression();
-}
-
-std::unique_ptr<ASTNode> Parser::parseAssignmentExpression() {
-    auto left = parseLogicalOrExpression();
-
-    if (currentToken.type == TokenType::T_ASSIGN) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseAssignmentExpression();
-        return makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseLogicalOrExpression() {
-    auto left = parseLogicalAndExpression();
-
-    while (currentToken.type == TokenType::T_OR) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseLogicalAndExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseLogicalAndExpression() {
-    auto left = parseEqualityExpression();
-
-    while (currentToken.type == TokenType::T_AND) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseEqualityExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseEqualityExpression() {
-    auto left = parseRelationalExpression();
-
-    while (currentToken.type == TokenType::T_EQ || currentToken.type == TokenType::T_NE) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseRelationalExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseRelationalExpression() {
-    auto left = parseAdditiveExpression();
-
-    while (currentToken.type == TokenType::T_LT || currentToken.type == TokenType::T_GT ||
-           currentToken.type == TokenType::T_LE || currentToken.type == TokenType::T_GE) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseAdditiveExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseAdditiveExpression() {
-    auto left = parseMultiplicativeExpression();
-
-    while (currentToken.type == TokenType::T_PLUS || currentToken.type == TokenType::T_MINUS) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseMultiplicativeExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
-    }
-
-    return left;
-}
-
-std::unique_ptr<ASTNode> Parser::parseMultiplicativeExpression() {
+// Pratt parser implementation for expressions
+std::unique_ptr<ASTNode> Parser::parseExpression(int minPrecedence) {
+    // Parse the left-hand side (could be primary or unary expression)
     auto left = parseUnaryExpression();
 
-    while (currentToken.type == TokenType::T_STAR || currentToken.type == TokenType::T_SLASH ||
-           currentToken.type == TokenType::T_PERCENT) {
-        TokenType op = currentToken.type;
-        nextToken();
-        auto right = parseUnaryExpression();
-        left = makeBinaryNode(tokenToASTType(op), std::move(left), std::move(right));
+    // While we have operators with sufficient precedence
+    while (isOperator(currentToken.type) &&
+           getOperatorPrecedence(currentToken.type) >= minPrecedence) {
+
+        TokenType operatorToken = currentToken.type;
+        int operatorPrec = getOperatorPrecedence(operatorToken);
+
+        nextToken(); // consume the operator
+
+        // For right-associative operators, use the same precedence
+        // For left-associative operators, use precedence + 1
+        int nextMinPrec = isRightAssociative(operatorToken) ? operatorPrec : operatorPrec + 1;
+
+        // Parse the right-hand side with appropriate precedence
+        auto right = parseExpression(nextMinPrec);
+
+        // Create binary operator node
+        left = makeBinaryNode(tokenToASTType(operatorToken), std::move(left), std::move(right));
     }
 
     return left;
 }
 
 std::unique_ptr<ASTNode> Parser::parseUnaryExpression() {
+    // Handle unary operators
     if (currentToken.type == TokenType::T_MINUS) {
         nextToken();
         auto expr = parseUnaryExpression();
@@ -464,7 +311,7 @@ std::unique_ptr<ASTNode> Parser::parsePrimaryExpression() {
 
         case TokenType::T_LPAREN: {
             nextToken(); // consume '('
-            auto expr = parseExpression();
+            auto expr = parseExpression(0); // Start with minimum precedence
             expectToken(TokenType::T_RPAREN);
             return expr;
         }
@@ -473,6 +320,232 @@ std::unique_ptr<ASTNode> Parser::parsePrimaryExpression() {
             unexpectedToken("primary expression");
             return nullptr; // This won't be reached due to error
     }
+}
+
+// Test method for expression parsing only
+std::unique_ptr<ASTNode> Parser::parseExpressionOnly() {
+    auto expr = parseExpression(0);
+    if (currentToken.type == TokenType::T_SEMICOLON) {
+        nextToken();
+    }
+    if (currentToken.type != TokenType::T_EOF) {
+        error("Expected end of expression");
+    }
+    return expr;
+}
+
+std::unique_ptr<ASTNode> Parser::parseProgram() {
+    auto program = makeLeafNode(ASTNodeType::PROGRAM);
+
+    while (currentToken.type != TokenType::T_EOF) {
+        try {
+            auto stmt = parseStatement();
+            if (stmt) {
+                program->children.push_back(std::move(stmt));
+            }
+        } catch (const std::runtime_error& e) {
+            // Skip to next statement on error
+            while (currentToken.type != TokenType::T_SEMICOLON &&
+                   currentToken.type != TokenType::T_EOF) {
+                nextToken();
+            }
+            if (currentToken.type == TokenType::T_SEMICOLON) {
+                nextToken();
+            }
+        }
+    }
+
+    return program;
+}
+
+std::unique_ptr<ASTNode> Parser::parseStatement() {
+    switch (currentToken.type) {
+        case TokenType::T_INT:
+        case TokenType::T_FLOAT:
+        case TokenType::T_CHAR:
+        case TokenType::T_DOUBLE:
+        case TokenType::T_BOOL:
+            return parseDeclaration();
+
+        case TokenType::T_COUT:
+            return parseCoutStatement();
+
+        case TokenType::T_CIN:
+            return parseCinStatement();
+
+        case TokenType::T_IF:
+            return parseIfStatement();
+
+        case TokenType::T_WHILE:
+            return parseWhileStatement();
+
+        case TokenType::T_FOR:
+            return parseForStatement();
+
+        case TokenType::T_RETURN:
+            return parseReturnStatement();
+
+        case TokenType::T_LBRACE:
+            return parseCompoundStatement();
+
+        default:
+            return parseExpressionStatement();
+    }
+}
+
+std::unique_ptr<ASTNode> Parser::parseExpressionStatement() {
+    auto expr = parseExpression(0); // Use Pratt parser for expressions
+    expectToken(TokenType::T_SEMICOLON);
+    return makeUnaryNode(ASTNodeType::EXPRESSION_STMT, std::move(expr));
+}
+
+std::unique_ptr<ASTNode> Parser::parseDeclaration() {
+    // Consume the type token (we don't need to store it for now)
+    nextToken(); // consume type
+
+    if (currentToken.type != TokenType::T_IDENT) {
+        unexpectedToken("identifier");
+    }
+
+    std::string varName = currentToken.value;
+    nextToken(); // consume identifier
+
+    auto decl = makeLeafNode(ASTNodeType::VAR_DECL, varName);
+
+    // Check for initialization
+    if (matchToken(TokenType::T_ASSIGN)) {
+        auto initExpr = parseExpression(0); // Use Pratt parser
+        decl->left = std::move(initExpr);
+    }
+
+    expectToken(TokenType::T_SEMICOLON);
+    return decl;
+}
+
+std::unique_ptr<ASTNode> Parser::parseCoutStatement() {
+    expectToken(TokenType::T_COUT);
+
+    auto coutStmt = makeLeafNode(ASTNodeType::COUT_STMT);
+
+    while (currentToken.type == TokenType::T_LSHIFT) {
+        nextToken(); // consume <<
+        auto expr = parseExpression(getOperatorPrecedence(TokenType::T_LSHIFT) + 1);
+        coutStmt->children.push_back(std::move(expr));
+    }
+
+    expectToken(TokenType::T_SEMICOLON);
+    return coutStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseCinStatement() {
+    expectToken(TokenType::T_CIN);
+
+    auto cinStmt = makeLeafNode(ASTNodeType::CIN_STMT);
+
+    while (currentToken.type == TokenType::T_RSHIFT) {
+        nextToken(); // consume >>
+        auto expr = parseExpression(getOperatorPrecedence(TokenType::T_RSHIFT) + 1);
+        cinStmt->children.push_back(std::move(expr));
+    }
+
+    expectToken(TokenType::T_SEMICOLON);
+    return cinStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseIfStatement() {
+    expectToken(TokenType::T_IF);
+    expectToken(TokenType::T_LPAREN);
+
+    auto condition = parseExpression(0);
+    expectToken(TokenType::T_RPAREN);
+
+    auto thenStmt = parseStatement();
+
+    auto ifStmt = makeLeafNode(ASTNodeType::IF_STMT);
+    ifStmt->children.push_back(std::move(condition));
+    ifStmt->children.push_back(std::move(thenStmt));
+
+    if (matchToken(TokenType::T_ELSE)) {
+        auto elseStmt = parseStatement();
+        ifStmt->children.push_back(std::move(elseStmt));
+    }
+
+    return ifStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseWhileStatement() {
+    expectToken(TokenType::T_WHILE);
+    expectToken(TokenType::T_LPAREN);
+
+    auto condition = parseExpression(0);
+    expectToken(TokenType::T_RPAREN);
+
+    auto body = parseStatement();
+
+    auto whileStmt = makeLeafNode(ASTNodeType::WHILE_STMT);
+    whileStmt->children.push_back(std::move(condition));
+    whileStmt->children.push_back(std::move(body));
+
+    return whileStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseForStatement() {
+    expectToken(TokenType::T_FOR);
+    expectToken(TokenType::T_LPAREN);
+
+    auto forStmt = makeLeafNode(ASTNodeType::FOR_STMT);
+
+    // Initialization
+    if (currentToken.type != TokenType::T_SEMICOLON) {
+        forStmt->children.push_back(parseExpression(0));
+    }
+    expectToken(TokenType::T_SEMICOLON);
+
+    // Condition
+    if (currentToken.type != TokenType::T_SEMICOLON) {
+        forStmt->children.push_back(parseExpression(0));
+    }
+    expectToken(TokenType::T_SEMICOLON);
+
+    // Update
+    if (currentToken.type != TokenType::T_RPAREN) {
+        forStmt->children.push_back(parseExpression(0));
+    }
+    expectToken(TokenType::T_RPAREN);
+
+    // Body
+    forStmt->children.push_back(parseStatement());
+
+    return forStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseReturnStatement() {
+    expectToken(TokenType::T_RETURN);
+
+    auto returnStmt = makeLeafNode(ASTNodeType::RETURN_STMT);
+
+    if (currentToken.type != TokenType::T_SEMICOLON) {
+        returnStmt->left = parseExpression(0);
+    }
+
+    expectToken(TokenType::T_SEMICOLON);
+    return returnStmt;
+}
+
+std::unique_ptr<ASTNode> Parser::parseCompoundStatement() {
+    expectToken(TokenType::T_LBRACE);
+
+    auto compound = makeLeafNode(ASTNodeType::COMPOUND_STMT);
+
+    while (currentToken.type != TokenType::T_RBRACE && currentToken.type != TokenType::T_EOF) {
+        auto stmt = parseStatement();
+        if (stmt) {
+            compound->children.push_back(std::move(stmt));
+        }
+    }
+
+    expectToken(TokenType::T_RBRACE);
+    return compound;
 }
 
 // Debug method to print AST
