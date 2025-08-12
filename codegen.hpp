@@ -1,6 +1,8 @@
 #ifndef CODEGEN_HPP
 #define CODEGEN_HPP
+
 #include "parser.hpp"
+#include "symboltable.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -16,13 +18,20 @@ private:
     std::vector<bool> usedRegisters; // Track which registers are in use
     int labelCounter;               // For generating unique labels
 
-    // Variable management
-    std::unordered_map<std::string, int> symbolTable;  // Variable name -> stack offset
-    int stackOffset;                                   // Current stack offset
+    // Symbol table for variable management
+    SymbolTable symbolTable;
+    int stackOffset;               // Current stack offset
 
     // Register management
     static const int MAX_REGISTERS = 8;  // Using r8-r15 for temporaries
     static const std::string registers[];
+
+    // Private helper methods
+    int allocateRegister();
+    void freeRegister(int reg);
+    void freeAllRegisters();
+    bool isValidRegister(int reg);
+    std::string getRegisterName(int reg);
 
     // Variable management methods
     void addVariable(const std::string& name);
@@ -30,12 +39,14 @@ private:
     void loadVariable(int reg, const std::string& name);
     void storeVariable(const std::string& name, int reg);
 
+    // Code generation helpers
+    void generateBinaryOp(ASTNodeType op, int leftReg, int rightReg);
+    void generateUnaryOp(ASTNodeType op, int reg);
+
 public:
-    // Constructor - outputs to provided stream
+    // Constructors and destructor
     CodeGenerator(std::ostream* out);
-    // Constructor - outputs to file
     CodeGenerator(const std::string& filename);
-    // Destructor
     ~CodeGenerator();
 
     // Main code generation entry point
@@ -46,33 +57,25 @@ public:
     void generateStatement(const std::unique_ptr<ASTNode>& node);
     void generateProgram(const std::unique_ptr<ASTNode>& node);
 
-    // Register management
-    int allocateRegister();
-    void freeRegister(int reg);
-    void freeAllRegisters();
-
     // Assembly output helpers
     void emit(const std::string& instruction);
     void emitComment(const std::string& comment);
     void emitLabel(const std::string& label);
     std::string generateLabel(const std::string& prefix = "L");
 
-    // Code generation helpers
+    // Code generation structure
     void generatePreamble();
     void generatePostamble(int exitCode = 0);
-    void generateBinaryOp(ASTNodeType op, int leftReg, int rightReg);
-    void generateUnaryOp(ASTNodeType op, int reg);
 
     // Load immediate values
     void loadImmediate(int reg, int value);
     void loadImmediate(int reg, float value);
 
-    // Utility functions
-    std::string getRegisterName(int reg);
-    bool isValidRegister(int reg);
-
     // Error handling
     void error(const std::string& message);
+
+    // Symbol table access
+    SymbolTable& getSymbolTable() { return symbolTable; }
 };
 
 #endif // CODEGEN_HPP

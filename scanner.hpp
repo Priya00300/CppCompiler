@@ -5,9 +5,10 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class Scanner {
-private:
+protected:  // Changed from private to protected so StringScanner can access
     std::ifstream inputFile;
     std::string currentLine;
     size_t currentPos;
@@ -15,6 +16,9 @@ private:
     int columnNumber;
     char currentChar;
     bool isEOF;
+
+    // Add the missing keywords map
+    std::unordered_map<std::string, TokenType> keywords;
 
 public:
     Scanner();
@@ -33,7 +37,7 @@ public:
     virtual int getCurrentLine() const { return lineNumber; }
     virtual int getCurrentColumn() const { return columnNumber; }
 
-private:
+protected:  // Changed from private to protected so StringScanner can access
     // Character handling
     void nextChar();
     char peekChar();
@@ -59,6 +63,9 @@ private:
 
     // Read next line from file
     bool readNextLine();
+
+    // Initialize keywords - ADD THIS METHOD
+    void initializeKeywords();
 };
 
 #endif // SCANNER_HPP

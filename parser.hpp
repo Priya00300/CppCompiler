@@ -1,155 +1,178 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include "tokens.hpp"
 #include "scanner.hpp"
+#include "tokens.hpp"
 #include <memory>
 #include <vector>
-#include <string>
-#include <stdexcept>
+#include <iostream>
 
-// AST Node Types
+// Forward declaration
+class Scanner;
+class StringScanner;
+
+// AST Node Types - Enhanced with more statement types
 enum class ASTNodeType {
     // Literals
     INTLIT,
     FLOATLIT,
     STRINGLIT,
     CHARLIT,
+    BOOLLIT,
+
+    // Identifiers
     IDENTIFIER,
 
-    // Binary Operations - Arithmetic
+    // Binary operations
     ADD,
     SUBTRACT,
     MULTIPLY,
     DIVIDE,
     MODULO,
 
-    // Assignment
-    ASSIGN,
+    // Comparison operations
+    EQ,          // ==
+    NE,          // !=
+    LT,          // <
+    GT,          // >
+    LE,          // <=
+    GE,          // >=
 
-    // Comparison operators
-    EQ,         // ==
-    NE,         // !=
-    LT,         // <
-    GT,         // >
-    LE,         // <=
-    GE,         // >=
-
-    // Logical operators
-    AND,        // &&
-    OR,         // ||
-    NOT,        // !
+    // Logical operations
+    AND,         // &&
+    OR,          // ||
+    NOT,         // !
 
     // Unary operations
-    NEGATE,     // unary -
-    POSITIVE,   // unary +
+    NEGATE,      // -
+    POSITIVE,    // +
+
+    // Assignment
+    ASSIGN,      // =
 
     // Statements
-    EXPRESSION_STMT,
-    COUT_STMT,
-    CIN_STMT,
-    IF_STMT,
-    WHILE_STMT,
-    FOR_STMT,
-    RETURN_STMT,
-    COMPOUND_STMT,  // { ... }
+    VAR_DECL,           // int x;
+    EXPRESSION_STMT,    // expression;
+    COMPOUND_STMT,      // { ... }
+    IF_STMT,           // if (condition) statement
+    WHILE_STMT,        // while (condition) statement
+    FOR_STMT,          // for (init; condition; update) statement
+    RETURN_STMT,       // return expression;
 
-    // Declarations
-    VAR_DECL,
+    // I/O Statements
+    COUT_STMT,         // cout << expression;
+    CIN_STMT,          // cin >> variable;
 
     // Program structure
-    PROGRAM
+    PROGRAM,           // Root node
+    BLOCK              // Block of statements
 };
-
-// Forward declaration
-struct ASTNode;
 
 // AST Node structure
 struct ASTNode {
     ASTNodeType type;
-    std::string value;          // For literals and identifiers
+    std::string value;           // For identifiers, literals
     int intValue;               // For integer literals
     float floatValue;           // For float literals
+    bool boolValue;            // For boolean literals
 
     std::unique_ptr<ASTNode> left;
     std::unique_ptr<ASTNode> right;
-    std::vector<std::unique_ptr<ASTNode>> children;  // For statements with multiple children
+    std::unique_ptr<ASTNode> condition;  // For if/while statements
+    std::vector<std::unique_ptr<ASTNode>> children;  // For compound statements
 
-    // Constructor for leaf nodes (literals, identifiers)
-    ASTNode(ASTNodeType t, const std::string& v = "", int iv = 0, float fv = 0.0f)
-        : type(t), value(v), intValue(iv), floatValue(fv), left(nullptr), right(nullptr) {}
+    // Constructor
+    ASTNode(ASTNodeType t) : type(t), intValue(0), floatValue(0.0f), boolValue(false) {}
 
-    // Constructor for binary operations
-    ASTNode(ASTNodeType t, std::unique_ptr<ASTNode> l, std::unique_ptr<ASTNode> r)
-        : type(t), value(""), intValue(0), floatValue(0.0f), left(std::move(l)), right(std::move(r)) {}
-
-    // Constructor for unary operations
-    ASTNode(ASTNodeType t, std::unique_ptr<ASTNode> child)
-        : type(t), value(""), intValue(0), floatValue(0.0f), left(std::move(child)), right(nullptr) {}
+    // Copy constructor and assignment operator deleted to prevent issues
+    ASTNode(const ASTNode&) = delete;
+    ASTNode& operator=(const ASTNode&) = delete;
 };
 
+// Parser class
 class Parser {
 private:
     Scanner* scanner;
     Token currentToken;
-    bool hasCurrentToken;
+    bool ownedScanner;  // Whether we own the scanner
 
-    // Operator precedence table - higher numbers = higher precedence
-    static const int precedenceTable[];
-
-    // Error handling
-    void error(const std::string& message);
-    void unexpectedToken(const std::string& expected = "");
-
-    // Token management
+    // Token handling
     void nextToken();
     void expectToken(TokenType expected);
     bool matchToken(TokenType expected);
 
-    // AST creation helpers
-    std::unique_ptr<ASTNode> makeLeafNode(ASTNodeType type, const std::string& value = "",
-                                         int intVal = 0, float floatVal = 0.0f);
-    std::unique_ptr<ASTNode> makeBinaryNode(ASTNodeType type, std::unique_ptr<ASTNode> left,
-                                           std::unique_ptr<ASTNode> right);
-    std::unique_ptr<ASTNode> makeUnaryNode(ASTNodeType type, std::unique_ptr<ASTNode> child);
-
-    // Precedence and operator handling
-    int getOperatorPrecedence(TokenType tokenType);
-    bool isOperator(TokenType tokenType);
-    bool isRightAssociative(TokenType tokenType);
-    ASTNodeType tokenToASTType(TokenType tokenType);
-
-    // Pratt parsing - core expression parsing
+    // Expression parsing (Pratt parser)
     std::unique_ptr<ASTNode> parseExpression(int minPrecedence = 0);
-    std::unique_ptr<ASTNode> parsePrimaryExpression();
-    std::unique_ptr<ASTNode> parseUnaryExpression();
+    std::unique_ptr<ASTNode> parsePrimary();
+    std::unique_ptr<ASTNode> parseUnary();
 
-    // Statement parsing methods
-    std::unique_ptr<ASTNode> parseProgram();
+    // Statement parsing
     std::unique_ptr<ASTNode> parseStatement();
+    std::unique_ptr<ASTNode> parseVariableDeclaration();
     std::unique_ptr<ASTNode> parseExpressionStatement();
-    std::unique_ptr<ASTNode> parseDeclaration();
-    std::unique_ptr<ASTNode> parseCoutStatement();
-    std::unique_ptr<ASTNode> parseCinStatement();
+    std::unique_ptr<ASTNode> parseCompoundStatement();
     std::unique_ptr<ASTNode> parseIfStatement();
     std::unique_ptr<ASTNode> parseWhileStatement();
     std::unique_ptr<ASTNode> parseForStatement();
     std::unique_ptr<ASTNode> parseReturnStatement();
-    std::unique_ptr<ASTNode> parseCompoundStatement();
+    std::unique_ptr<ASTNode> parseCoutStatement();
+    std::unique_ptr<ASTNode> parseCinStatement();
+
+    // Program parsing
+    std::unique_ptr<ASTNode> parseProgram();
+
+    // Precedence handling
+    int getOperatorPrecedence(TokenType tokenType);
+    bool isRightAssociative(TokenType tokenType);
+    ASTNodeType tokenToASTNode(TokenType tokenType);
+
+    // Error handling
+    void error(const std::string& message);
+    void synchronize(); // Error recovery
 
 public:
-    Parser(Scanner* scan);
-    ~Parser() = default;
+    // Constructors
+    explicit Parser(Scanner* s);
+    explicit Parser(const std::string& input); // For string parsing
+    ~Parser();
 
-    // Main parsing entry point
+    // Main parsing methods
     std::unique_ptr<ASTNode> parse();
-
-    // Debug and utility methods
-    void printAST(const std::unique_ptr<ASTNode>& node, int indent = 0);
-    std::string astNodeTypeToString(ASTNodeType type);
-
-    // Test expression parsing specifically
     std::unique_ptr<ASTNode> parseExpressionOnly();
+
+    // Utility methods
+    void printAST(const std::unique_ptr<ASTNode>& node, int depth = 0);
+    std::string astNodeTypeToString(ASTNodeType type);
+};
+
+// String scanner for parsing expressions from strings
+class StringScanner : public Scanner {
+private:
+    std::string input;
+    size_t position;
+    int line;
+    int column;
+    std::unordered_map<std::string, TokenType> keywords;
+
+public:
+    StringScanner(const std::string& text);
+    Token getNextToken() override;
+    Token peekToken() override;
+    int getCurrentLine() const override { return line; }
+    int getCurrentColumn() const override { return column; }
+
+private:
+    void skipWhitespace();
+    Token scanNumber();
+    Token scanString();
+    Token scanCharacter();
+    Token scanIdentifier();
+    Token scanOperator();
+    bool isAtEnd() const { return position >= input.length(); }
+    char currentChar() const { return isAtEnd() ? '\0' : input[position]; }
+    char peekChar() const { return (position + 1 >= input.length()) ? '\0' : input[position + 1]; }
+    void advance() { if (!isAtEnd()) { position++; column++; } }
+    void initializeKeywords();
 };
 
 #endif // PARSER_HPP

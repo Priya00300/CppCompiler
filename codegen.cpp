@@ -94,34 +94,43 @@ void CodeGenerator::loadImmediate(int reg, float value) {
     emit("movq $" + std::to_string(static_cast<int>(value)) + ", " + getRegisterName(reg));
 }
 
-// Symbol table management
+// Symbol table management - UPDATED for SymbolTable class
 void CodeGenerator::addVariable(const std::string& name) {
-    if (symbolTable.find(name) != symbolTable.end()) {
+    if (!symbolTable.addSymbol(name, SymbolType::INTEGER)) {
         error("Variable '" + name + "' already declared");
     }
-
-    stackOffset -= 8;  // Each variable takes 8 bytes (64-bit)
-    symbolTable[name] = stackOffset;
-    emitComment("Variable '" + name + "' allocated at offset " + std::to_string(stackOffset));
+    emitComment("Variable '" + name + "' declared");
 }
 
 int CodeGenerator::getVariableOffset(const std::string& name) {
-    auto it = symbolTable.find(name);
-    if (it == symbolTable.end()) {
+    Symbol* sym = symbolTable.findSymbol(name);
+    if (!sym) {
         error("Variable '" + name + "' not declared");
     }
-    return it->second;
+    return sym->offset;
 }
 
 void CodeGenerator::loadVariable(int reg, const std::string& name) {
-    int offset = getVariableOffset(name);
-    emit("movq " + std::to_string(offset) + "(%rbp), " + getRegisterName(reg));
+    Symbol* sym = symbolTable.findSymbol(name);
+    if (!sym) {
+        error("Variable '" + name + "' not declared");
+    }
+    if (!sym->initialized) {
+        error("Variable '" + name + "' used before initialization");
+    }
+
+    emit("movq " + std::to_string(sym->offset) + "(%rbp), " + getRegisterName(reg));
     emitComment("Load variable '" + name + "'");
 }
 
 void CodeGenerator::storeVariable(const std::string& name, int reg) {
-    int offset = getVariableOffset(name);
-    emit("movq " + getRegisterName(reg) + ", " + std::to_string(offset) + "(%rbp)");
+    Symbol* sym = symbolTable.findSymbol(name);
+    if (!sym) {
+        error("Variable '" + name + "' not declared");
+    }
+
+    emit("movq " + getRegisterName(reg) + ", " + std::to_string(sym->offset) + "(%rbp)");
+    symbolTable.markInitialized(name);
     emitComment("Store to variable '" + name + "'");
 }
 
@@ -517,7 +526,7 @@ void CodeGenerator::generateCode(const std::unique_ptr<ASTNode>& ast) {
     freeAllRegisters();
     labelCounter = 0;
     stackOffset = 0;
-    symbolTable.clear();
+    symbolTable.clear();  // Clear the symbol table (assuming it has a clear method)
 
     if (ast->type == ASTNodeType::PROGRAM) {
         generateProgram(ast);

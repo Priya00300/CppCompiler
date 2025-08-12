@@ -14,6 +14,47 @@ Scanner::~Scanner() {
     }
 }
 
+// Initialize keywords map - THIS WAS MISSING!
+void Scanner::initializeKeywords() {
+    // Clear the map first
+    keywords.clear();
+
+    // Data types
+    keywords["int"] = TokenType::T_INT;
+    keywords["float"] = TokenType::T_FLOAT;
+    keywords["char"] = TokenType::T_CHAR;
+    keywords["double"] = TokenType::T_DOUBLE;
+    keywords["bool"] = TokenType::T_BOOL;
+    keywords["void"] = TokenType::T_VOID;
+
+    // Control flow
+    keywords["if"] = TokenType::T_IF;
+    keywords["else"] = TokenType::T_ELSE;
+    keywords["while"] = TokenType::T_WHILE;
+    keywords["for"] = TokenType::T_FOR;
+    keywords["return"] = TokenType::T_RETURN;
+
+    // I/O
+    keywords["cout"] = TokenType::T_COUT;
+    keywords["cin"] = TokenType::T_CIN;
+    keywords["endl"] = TokenType::T_ENDL;
+
+    // Boolean literals
+    keywords["true"] = TokenType::T_TRUE;
+    keywords["false"] = TokenType::T_FALSE;
+
+    // Other keywords
+    keywords["const"] = TokenType::T_CONST;
+    keywords["class"] = TokenType::T_CLASS;
+    keywords["public"] = TokenType::T_PUBLIC;
+    keywords["private"] = TokenType::T_PRIVATE;
+    keywords["protected"] = TokenType::T_PROTECTED;
+    keywords["namespace"] = TokenType::T_NAMESPACE;
+    keywords["std"] = TokenType::T_STD;
+    keywords["using"] = TokenType::T_USING;
+    keywords["include"] = TokenType::T_INCLUDE;
+}
+
 bool Scanner::initialize(const std::string& filename) {
     inputFile.open(filename);
     if (!inputFile.is_open()) {
